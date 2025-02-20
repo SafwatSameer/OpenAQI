@@ -1,2 +1,0 @@
-# OpenAQI
-hello World
