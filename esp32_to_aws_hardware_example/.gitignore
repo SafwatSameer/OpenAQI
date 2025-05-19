@@ -1,0 +1,6 @@
+.pio
+# AWS Certificates
+esp32_to_aws_hardware_example/data/certs/*
+
+# IDE Files
+.vscode/

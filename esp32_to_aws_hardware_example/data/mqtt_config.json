@@ -1,0 +1,8 @@
+{
+    "port": 8883,
+    "host": "a2wdh2aj24lvh-ats.iot.us-east-1.amazonaws.com",
+    "clientId": "esp32_test1",
+    "publishTopic": "esp32/sensor/test"
+  }
+  
+  
