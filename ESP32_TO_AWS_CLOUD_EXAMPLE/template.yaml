@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  esp32-to-aws-cloud-example
+
+  Sample SAM Template for esp32-to-aws-cloud-example
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 5
+    MemorySize: 128
+    Environment:
+      Variables:
+        ThingDataTable: "ThingDataTable"
+
+Resources:
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: "lambda-function-policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+        - PolicyName: DynamoDBCRUDPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: "*"
+
+  MQTTSubscribeHandler:
+    Type: AWS::Serverless::Function
+    Properties:
+      Role: !GetAtt LambdaFunctionRole.Arn
+      FunctionName: "esp32_to_aws_mqtt-subscribe-handler"
+      CodeUri: ./functions/mqtt-subscribe-handler
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+
+  ThingData:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: "ThingDataTable"
+      AttributeDefinitions:
+        - AttributeName: clientId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: clientId
+          KeyType: HASH
+        - AttributeName: createdAt
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+
+  IoTTopicRule:
+    Type: AWS::IoT::TopicRule
+    Properties:
+      TopicRulePayload:
+        RuleDisabled: false
+        Sql: "SELECT *, clientId, temperature, humidity, pm1, pm25, pm10, date, time FROM 'esp32/sensor/test'"
+        Actions:
+          - Lambda:
+              FunctionArn: !GetAtt MQTTSubscribeHandler.Arn
+
+  MQTTSubscribeHandlerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt MQTTSubscribeHandler.Arn
+      Principal: iot.amazonaws.com
+      SourceArn: !GetAtt IoTTopicRule.Arn
